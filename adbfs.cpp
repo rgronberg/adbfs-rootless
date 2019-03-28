@@ -81,6 +81,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+#include <fuse_opt.h>
 
 void handler(int sig) {
   void *array[10];
@@ -983,6 +984,70 @@ static int adb_readlink(const char *path, char *buf, size_t size)
 static struct fuse_operations adbfs_oper;
 
 /**
+   adbfs user options structure used in fuse_opt_parse
+ */
+struct adbfs_config {
+    const char *cache_size_string;
+};
+
+enum {
+    KEY_HELP,
+    KEY_VERSION,
+};
+
+
+/**
+   user fuse_opt structure used in fuse_opt_parse
+ */
+#define ADBFS_OPT(t, p, v) { t, offsetof(struct adbfs_config, p), v }
+static struct fuse_opt adbfs_opts[] = {
+    ADBFS_OPT("cache=%s",           cache_size_string, 0),
+
+    FUSE_OPT_KEY("-v",              KEY_VERSION),
+    FUSE_OPT_KEY("--version",       KEY_VERSION),
+    FUSE_OPT_KEY("-h",              KEY_HELP),
+    FUSE_OPT_KEY("--help",          KEY_HELP),
+    FUSE_OPT_END
+};
+
+/**
+   Catch help and version flags early and exit.
+ */
+static int adbfs_opt_proc(void *data, const char *arg, int key, struct fuse_args *outargs)
+{
+    switch (key) {
+        case KEY_HELP:
+            fprintf(stderr,
+                "usage: %s mountpoint [options]\n"
+                "\n"
+                "general options:\n"
+                "    -o opt,[opt...]  mount options\n"
+                "    -h   --help      print help\n"
+                "    -v   --version   print version\n"
+                "\n"
+                "FUSE options:\n"
+                "    -d   -o debug    enable debug output (implies -f)\n"
+                "    -f               foreground operation\n"
+                "    -s               disable multi-threaded operation\n"
+                "\n"
+                "adbfs options:\n"
+                "    -o cache=SIZE    size of cache to keep in tmp.\n"
+                "\n"
+                "SIZE may be followed by the following multiplicative suffixes:\n"
+                "K =1024, M =1024*1024, and G =1024*1024*1024.\n"
+                , outargs->argv[0]);
+            exit(0);
+
+        case KEY_VERSION:
+            fprintf(stderr, "adbfs version %s\n", "v0.1");
+            fuse_opt_add_arg(outargs, "--version");
+            fuse_main(outargs->argc, outargs->argv, &adbfs_oper, NULL);
+            exit(0);
+    }
+    return 1;
+}
+
+/**
    Set up the fuse_operations struct adbfs_oper using above adb_*
    functions and then call fuse_main to manage things.
 
@@ -990,6 +1055,11 @@ static struct fuse_operations adbfs_oper;
  */
 int main(int argc, char *argv[])
 {
+    struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+    struct adbfs_config adbfs_config;
+    memset(&adbfs_config, 0, sizeof(adbfs_config));
+    fuse_opt_parse(&args, &adbfs_config, adbfs_opts, adbfs_opt_proc);
+
     signal(SIGSEGV, handler);   // install our handler
     makeTmpDir();
     memset(&adbfs_oper, 0, sizeof(adbfs_oper));
@@ -1010,5 +1080,5 @@ int main(int argc, char *argv[])
     adbfs_oper.unlink = adb_unlink;
     adbfs_oper.readlink = adb_readlink;
     adb_shell("ls");
-    return fuse_main(argc, argv, &adbfs_oper, NULL);
+    return fuse_main(args.argc, args.argv, &adbfs_oper, NULL);
 }
