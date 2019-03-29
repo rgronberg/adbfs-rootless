@@ -13,8 +13,11 @@ debug: $(TARGET)
 adbfs.o: adbfs.cpp utils.h
 	$(CXX) -c -o adbfs.o adbfs.cpp $(CXXFLAGS) $(CPPFLAGS)
 
-$(TARGET): adbfs.o
-	$(CXX) -o $(TARGET) adbfs.o $(LDFLAGS)
+cache_manager.o: cache_manager.cpp cache_manager.h
+	$(CXX) -c -o cache_manager.o cache_manager.cpp $(CXXFLAGS) $(CPPFLAGS)
+
+$(TARGET): adbfs.o cache_manager.o
+	$(CXX) -o $(TARGET) adbfs.o cache_manager.o $(LDFLAGS)
 
 .PHONY: clean
 

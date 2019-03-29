@@ -1,5 +1,5 @@
 adbfs
-adbfs.o
+*.o
 .cproject
 .project
 .settings

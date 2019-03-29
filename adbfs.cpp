@@ -72,6 +72,7 @@
  */
 
 #define FUSE_USE_VERSION 26
+#include "cache_manager.h"
 #include "utils.h"
 #include <unistd.h>
 
@@ -984,6 +985,11 @@ static int adb_readlink(const char *path, char *buf, size_t size)
 static struct fuse_operations adbfs_oper;
 
 /**
+   Global CacheManager instance to limit data stored in TmpDir
+ */
+static CacheManager *cache_manager;
+
+/**
    adbfs user options structure used in fuse_opt_parse
  */
 struct adbfs_config {
@@ -1058,7 +1064,10 @@ int main(int argc, char *argv[])
     struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
     struct adbfs_config adbfs_config;
     memset(&adbfs_config, 0, sizeof(adbfs_config));
+    adbfs_config.cache_size_string = "0";
     fuse_opt_parse(&args, &adbfs_config, adbfs_opts, adbfs_opt_proc);
+
+    cache_manager = new CacheManager(adbfs_config.cache_size_string);
 
     signal(SIGSEGV, handler);   // install our handler
     makeTmpDir();
